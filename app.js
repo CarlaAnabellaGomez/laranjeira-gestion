@@ -57,7 +57,7 @@ const ultNo=p=>{const e=p.entregas||[];const u=e[e.length-1];return p.estado!=='
 // ---------- lista
 function vLista(){const q=S.q;let ps=misPedidos().slice().sort((a,b)=>(!!(b.habilitadoCorreccion&&b.estado==='entregado'))-(!!(a.habilitadoCorreccion&&a.estado==='entregado'))||b.numero-a.numero);if(q)ps=ps.filter(p=>match(p.clienteNombre+' '+p.numero,q));const todos=ps;if(S.fe)ps=ps.filter(p=>p.estado===S.fe);
  const pend=todos.filter(p=>p.estado==='pendiente').length;const hoy=today(),deHoy=ps.filter(p=>p.fecha===hoy&&p.estado!=='anulado');
- $('#main').innerHTML=`<div class="kp"><div><span>Pedidos de hoy</span><b>${deHoy.length}</b></div><div><span>Total de hoy</span><b>${money(deHoy.reduce((s,p)=>s+p.total,0))}</b></div><div><span>Por entregar</span><b>${pend}</b></div></div>
+ $('#main').innerHTML=`<div class="kp"><div><span>Pedidos de hoy</span><b>${deHoy.length}</b></div><div><span>Por entregar</span><b>${pend}</b></div></div>
  <div class="row" style="margin-bottom:8px">${['','pendiente','entregado'].map(f=>`<button class="${(S.fe||'')===f?'b':'s'}" style="flex:1;padding:8px" onclick="S.fe='${f}';vLista()">${f===''?'Todos':f==='pendiente'?'⏳ Pendientes':'✅ Entregados'}</button>`).join('')}</div>
  <input id="q" class="full" placeholder="Buscar cliente o N° de pedido…" value="${esc(q)}">
  ${ps.slice(0,80).map(p=>`<div class="ped ${p.estado}" onclick="ver('${p.id}')">${p.habilitadoCorreccion&&p.estado==='entregado'?'<div class="mu" style="color:#a15c00;font-weight:600">🔓 Habilitado para corregir</div>':''}<div class="row sp"><b>N° ${p.numero} · ${esc(p.clienteNombre)}</b><span class="tag ${p.estado}">${p.estado}</span></div>
