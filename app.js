@@ -52,13 +52,17 @@ window.go=v=>{S.vista=v;render();window.scrollTo(0,0)};
 function render(){document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.v===S.vista||(S.vista==='form'&&b.dataset.v==='nuevo'&&!S.draft.editId)));
  if(S.vista==='lista')return vLista();if(S.vista==='nuevo'){nuevo();return}if(S.vista==='form')return vForm();if(S.vista==='det')return vDet()}
 
+const fh=f=>{try{return new Date(f).toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'})}catch(e){return f}};
+const ultNo=p=>{const e=p.entregas||[];const u=e[e.length-1];return p.estado!=='entregado'&&u&&u.resultado==='No entregado'?u:null};
 // ---------- lista
-function vLista(){const q=S.q;let ps=misPedidos().slice().sort((a,b)=>b.numero-a.numero);if(q)ps=ps.filter(p=>match(p.clienteNombre+' '+p.numero,q));
- const hoy=today(),deHoy=ps.filter(p=>p.fecha===hoy&&p.estado!=='anulado');
- $('#main').innerHTML=`<div class="kp"><div><span>Pedidos de hoy</span><b>${deHoy.length}</b></div><div><span>Total de hoy</span><b>${money(deHoy.reduce((s,p)=>s+p.total,0))}</b></div></div>
+function vLista(){const q=S.q;let ps=misPedidos().slice().sort((a,b)=>b.numero-a.numero);if(q)ps=ps.filter(p=>match(p.clienteNombre+' '+p.numero,q));const todos=ps;if(S.fe)ps=ps.filter(p=>p.estado===S.fe);
+ const pend=todos.filter(p=>p.estado==='pendiente').length;const hoy=today(),deHoy=ps.filter(p=>p.fecha===hoy&&p.estado!=='anulado');
+ $('#main').innerHTML=`<div class="kp"><div><span>Pedidos de hoy</span><b>${deHoy.length}</b></div><div><span>Total de hoy</span><b>${money(deHoy.reduce((s,p)=>s+p.total,0))}</b></div><div><span>Por entregar</span><b>${pend}</b></div></div>
+ <div class="row" style="margin-bottom:8px">${['','pendiente','entregado'].map(f=>`<button class="${(S.fe||'')===f?'b':'s'}" style="flex:1;padding:8px" onclick="S.fe='${f}';vLista()">${f===''?'Todos':f==='pendiente'?'⏳ Pendientes':'✅ Entregados'}</button>`).join('')}</div>
  <input id="q" class="full" placeholder="Buscar cliente o N° de pedido…" value="${esc(q)}">
  ${ps.slice(0,80).map(p=>`<div class="ped ${p.estado}" onclick="ver('${p.id}')"><div class="row sp"><b>N° ${p.numero} · ${esc(p.clienteNombre)}</b><span class="tag ${p.estado}">${p.estado}</span></div>
   <div class="row sp mu"><span>${p.fecha}${p.entrega&&p.entrega!==p.fecha?' · entrega '+p.entrega:''} · ${p.cond==='CC'?'Cta. cte.':'Contado'}</span><b style="color:#222">${money(p.total)}</b></div>
+  ${p.estado==='entregado'?`<div class="mu">🚚 Entregado${p.entregadoPorNombre?' por '+esc(p.entregadoPorNombre):''}${p.entregadoEn?' · '+fh(p.entregadoEn):''}</div>`:ultNo(p)?`<div class="mu" style="color:#c62828">❌ No entregado: ${esc(ultNo(p).motivo)} · ${fh(ultNo(p).fecha)}</div>`:''}
   ${p.historial&&p.historial.length?`<div class="mu">✏️ corregido ${p.historial.length} vez/veces</div>`:''}</div>`).join('')||'<div class="card mu">Todavía no hay pedidos.</div>'}`;
  $('#q').oninput=e=>{S.q=e.target.value;clearTimeout(S.t);S.t=setTimeout(()=>{vLista();const i=$('#q');i.focus();i.setSelectionRange(i.value.length,i.value.length)},300)}}
 
@@ -121,13 +125,25 @@ function vDet(){const p=S.pedidos.find(x=>x.id===S.detId);if(!p)return go('lista
  <div class="card"><div class="row sp"><h2>Pedido N° ${p.numero}</h2><span class="tag ${p.estado}">${p.estado}</span></div><div class="mu">${esc(p.clienteNombre)} · ${p.fecha} · entrega ${p.entrega} · ${p.cond==='CC'?'Cuenta corriente':'Contado'}</div>
  <table>${p.items.map(i=>`<tr><td>${i.cant} ${i.lista==='min'?'kg/un':'bulto'}</td><td>${esc(i.nombre)}${i.oferta?' 🔥':''}</td><td class="n">${money(i.cant*i.precio)}</td></tr>`).join('')}<tr><th colspan="2">Total</th><th class="n">${money(p.total)}</th></tr></table>
  ${p.nota?`<div class="mu">Nota: ${esc(p.nota)}</div>`:''}
- <div class="row" style="margin-top:10px">${p.estado==='pendiente'?`<button class="b" onclick="editar('${p.id}')">✏️ Corregir</button>`:`<span class="mu">${p.estado==='entregado'?'Ya entregado: para cambios hablá con la administración.':'Pedido anulado.'}</span>`}
+ ${p.entregas&&p.entregas.length?`<div style="margin-top:8px">${p.entregas.slice().reverse().map(x=>`<div class="mu">${x.resultado==='Entregado'?'✅':'❌'} <b>${esc(x.resultado)}</b> · ${fh(x.fecha)} · ${esc(x.vendedorNombre||'')}${x.motivo?' · '+esc(x.motivo):''}${x.nota?' · '+esc(x.nota):''}</div>`).join('')}</div>`:''}
+ <div class="row" style="margin-top:10px">${p.estado==='pendiente'?`<button class="b" onclick="entrega('${p.id}')">🚚 Registrar entrega</button>`:''}${p.estado==='pendiente'?`<button class="b" onclick="editar('${p.id}')">✏️ Corregir</button>`:`<span class="mu">${p.estado==='entregado'?'Ya entregado: para cambios hablá con la administración.':'Pedido anulado.'}</span>`}
  ${tel?`<a class="s" href="https://wa.me/549${tel}?text=${encodeURIComponent(t)}" target="_blank" rel="noopener">📲 Enviar boleta</a>`:''}<button class="s" onclick="copiar('${p.id}')">Copiar boleta</button></div></div>
  <div class="card"><h3>Historial de correcciones</h3>${(p.historial||[]).slice().reverse().map(h=>`<div class="hist"><div class="row sp"><b>${new Date(h.fecha).toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'})}</b><span class="mu">${esc(h.por||'Administración')}</span></div>
   ${h.cambios?`<ul>${h.cambios.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:'<div class="mu">Cambios hechos desde el sistema</div>'}${h.motivo?`<div class="mu">Motivo: ${esc(h.motivo)}</div>`:''}<div class="mu">Total ${money(h.totalAnterior)} → ${money(h.totalNuevo??p.total)}</div></div>`).join('')||'<div class="mu">Sin correcciones.</div>'}
   <div class="mu" style="margin-top:6px">Creado ${p.creadoPorNombre?'por '+esc(p.creadoPorNombre)+' ':''}el ${p.fecha}.</div></div>`}
 window.copiar=async id=>{try{await navigator.clipboard.writeText(boletaTxt(S.pedidos.find(p=>p.id===id)));msg('Boleta copiada')}catch(e){msg('No se pudo copiar',true)}};
 
+const MOT_NOENT=['Cliente cerrado / no estaba','Rechazó el pedido','Falta de mercadería','Dirección incorrecta','Se reprograma','Otro'];
+window.entrega=id=>{const p=S.pedidos.find(x=>x.id===id);dlg(`<h2>🚚 Entrega – Pedido N° ${p.numero}</h2><div class="mu">${esc(p.clienteNombre)} · ${money(p.total)}</div>
+ <div class="row" style="margin:10px 0"><button class="b" style="flex:1" id="en_si" onclick="S.enR='Entregado';$('#en_mw').style.display='none';this.className='b';$('#en_no').className='s'">✅ Entregado</button><button class="s" style="flex:1" id="en_no" onclick="S.enR='No entregado';$('#en_mw').style.display='';this.className='b';$('#en_si').className='s'">❌ No entregado</button></div>
+ <div id="en_mw" style="display:none"><label>Motivo<select id="en_m">${MOT_NOENT.map(m=>`<option>${m}</option>`).join('')}</select></label></div>
+ <label>Nota<input id="en_n" placeholder="Ej.: lo recibió el encargado"></label>
+ <div class="mu" style="margin-bottom:8px">Se registra a tu nombre con la hora actual.</div>
+ <button class="b full" onclick="guardarEntrega('${id}')">Guardar</button><button class="s full" style="margin-top:6px" onclick="cerrar()">Cancelar</button>`);S.enR='Entregado'};
+window.guardarEntrega=async id=>{const p=S.pedidos.find(x=>x.id===id);const r=S.enR||'Entregado';const ahora=new Date().toISOString();const vid=(S.perfil&&S.perfil.vendedorId)||p.vendedorId||'';
+ const reg={resultado:r,fecha:ahora,vendedorId:vid,vendedorNombre:nombreYo(),motivo:r==='No entregado'?$('#en_m').value:'',nota:$('#en_n').value,registradoPor:nombreYo(),registrado:ahora,origen:'app vendedores'};
+ const upd={entregas:[...(p.entregas||[]),reg].slice(-20)};if(r==='Entregado')Object.assign(upd,{estado:'entregado',entregadoPor:vid,entregadoPorNombre:nombreYo(),entregadoEn:ahora});else Object.assign(upd,{estado:'pendiente',entregadoPor:'',entregadoPorNombre:'',entregadoEn:''});
+ try{await updateDoc(doc(fs,'pedidos/'+id),upd);cerrar();msg(r==='Entregado'?'Entrega registrada':'Registrado: no entregado');ver(id)}catch(e){msg('No se pudo guardar: '+e.code,true)}};
 // ---------- utilidades
 function picker(inp,box,src,pick){const I=$(inp),B=$(box);if(!I)return;let list=[],act=0;
  const draw=()=>{B.innerHTML=list.map((x,k)=>`<div class="${k===act?'on':''}" data-k="${k}">${x.html}</div>`).join('');B.style.display=list.length?'block':'none'};
