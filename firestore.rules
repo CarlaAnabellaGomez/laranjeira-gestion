@@ -1,0 +1,37 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signed() { return request.auth != null; }
+    function owner() { return signed() && request.auth.token.email == 'gomez.charlie29@gmail.com' && request.auth.token.email_verified == true; }
+    function perfilPath() { return /databases/$(database)/documents/usuarios/$(request.auth.uid); }
+    function activo() { return owner() || (signed() && exists(perfilPath()) && get(perfilPath()).data.activo == true); }
+    function secc(k) { return owner() || (activo() && get(perfilPath()).data.secc.hasAny([k])); }
+    function acc(k) { return owner() || (activo() && get(perfilPath()).data.acc.hasAny([k])); }
+    function admin() { return owner() || secc('usuarios'); }
+
+    match /usuarios/{uid} {
+      allow read: if activo() || (signed() && request.auth.uid == uid);
+      allow write: if admin();
+    }
+    match /solicitudes/{uid} {
+      allow read: if admin() || (signed() && request.auth.uid == uid);
+      allow create, update: if signed() && request.auth.uid == uid;
+      allow delete: if admin() || (signed() && request.auth.uid == uid);
+    }
+    match /gastos/{id} { allow read, write: if secc('gastos'); }
+    match /gastosFijos/{id} { allow read, write: if secc('gastos'); }
+    match /proveedores/{id} { allow read: if activo(); allow write: if secc('proveedores'); }
+    match /cotizaciones/{id} { allow read: if activo(); allow write: if secc('proveedores') || secc('stock'); }
+    match /camiones/{id} { allow read: if activo(); allow write: if secc('stock'); }
+    match /cierres/{id} { allow read: if activo(); allow write: if secc('stock'); }
+    match /vendedores/{id} { allow read: if activo(); allow write: if secc('vendedores'); }
+    match /movVendedores/{id} { allow read, write: if secc('vendedores'); }
+    match /clientes/{id} { allow read, create, update: if activo(); allow delete: if acc('eliminar'); }
+    match /productos/{id} { allow read, update: if activo(); allow create, delete: if acc('precios'); }
+    match /pedidos/{id} { allow read, create, update: if activo(); allow delete: if acc('eliminar'); }
+    match /pagos/{id} { allow read, create: if activo(); allow update, delete: if acc('cobrar') || acc('eliminar'); }
+    match /bajas/{id} { allow read, create, update: if activo(); allow delete: if acc('eliminar'); }
+    match /reposiciones/{id} { allow read, create, update: if activo(); allow delete: if acc('eliminar'); }
+    match /config/{id} { allow read, write: if activo(); }
+  }
+}
