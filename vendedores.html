@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Laranjeira · Vendedores</title><meta name="theme-color" content="#2e7d32"><link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Vendedores">
+<style>
+@font-face{font-family:'Chewy';src:url(chewy.woff2) format('woff2');font-display:swap}
+:root{--g:#2e7d32;--o:#f6a85c;--bg:#f6f7f5;--tx:#1d2420;--mu:#6b7570;--bd:#dfe3df}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--tx);font-size:16px}
+header{background:var(--g);color:#fff;padding:10px 14px 0;position:sticky;top:0;z-index:5;overflow:hidden}
+header .t{display:flex;align-items:center;gap:10px}header h1{font-family:'Chewy',system-ui;font-weight:400;color:var(--o);font-size:24px;margin:0;letter-spacing:1px;line-height:1}
+header .sub{font-size:12px;opacity:.85}header .logo{height:54px;width:auto;margin-left:auto}header .logo .arco{display:none}
+#tabs{display:flex;gap:6px;margin-top:8px}#tabs button{flex:1;background:transparent;color:#fff;border:0;border-bottom:3px solid transparent;padding:10px 4px;font-size:15px}#tabs button.on{border-color:var(--o);font-weight:600}
+#top.solo #tabs{display:none}#top.solo{padding-bottom:10px}
+.usr{display:flex;justify-content:space-between;align-items:center;font-size:12px;margin-top:4px;opacity:.9}.usr button{background:transparent;border:1px solid rgba(255,255,255,.5);color:#fff;border-radius:999px;padding:3px 10px;font-size:12px}
+main{padding:12px;max-width:640px;margin:0 auto 80px}
+.card{background:#fff;border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:12px}h2{font-size:18px;margin:0 0 8px}h3{font-size:15px;margin:0 0 8px}
+input,select,textarea{font:inherit;padding:11px;border:1px solid var(--bd);border-radius:10px;background:#fff;width:100%}textarea{min-height:64px;margin-top:8px}
+label{display:block;font-size:13px;color:var(--mu);margin-bottom:8px;flex:1;min-width:140px}label input,label select{margin-top:4px;color:var(--tx)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.sp{justify-content:space-between}.full{width:100%}.c{text-align:center;margin:10px 0}.mu{color:var(--mu);font-size:13px}
+button,a.s{font:inherit;border-radius:10px;padding:11px 14px;cursor:pointer;text-decoration:none;display:inline-block;text-align:center}.b{background:var(--g);color:#fff;border:0;font-weight:600}.s{background:#fff;color:var(--g);border:1px solid var(--g)}.x{background:#fff;color:#c62828;border:1px solid #f1c0c0;padding:6px 10px}button:disabled{opacity:.5}
+.sug{display:none;border:1px solid var(--bd);border-radius:10px;margin-top:4px;max-height:280px;overflow:auto;background:#fff}.sug div{padding:12px;border-bottom:1px solid #f0f0f0}.sug div.on{background:#eef6ee}
+.cli{display:flex;justify-content:space-between;align-items:center;gap:8px;background:#eef6ee;border-radius:10px;padding:10px}
+.it{display:grid;grid-template-columns:1fr auto;gap:6px 10px;align-items:center;padding:10px 0;border-bottom:1px solid #f0f0f0}.it .g{grid-column:1/2}.it .q{display:flex;align-items:center;gap:4px}.it .q button{width:40px;height:40px;padding:0;border:1px solid var(--bd);background:#fff;font-size:20px}.it .q input{width:64px;text-align:center;padding:8px}.it .st{text-align:right;font-weight:600}.it .x{justify-self:end}
+.tot{display:flex;justify-content:space-between;font-size:18px;padding:12px 0}
+.kp{display:flex;gap:8px;margin-bottom:10px}.kp div{flex:1;background:#fff;border:1px solid var(--bd);border-radius:12px;padding:10px}.kp span{display:block;font-size:12px;color:var(--mu)}.kp b{font-size:20px}
+#q{margin-bottom:10px}.ped{background:#fff;border:1px solid var(--bd);border-radius:12px;padding:12px;margin-bottom:8px;cursor:pointer}.ped.anulado{opacity:.55}
+.tag{font-size:12px;padding:2px 8px;border-radius:999px;background:#eee}.tag.pendiente{background:#fff3cd}.tag.entregado{background:#c8e6c9}.tag.anulado{background:#ffcdd2}
+table{width:100%;border-collapse:collapse;margin-top:8px}td,th{padding:7px 4px;border-bottom:1px solid #f0f0f0;text-align:left;font-size:14px}.n{text-align:right}
+.hist{border-left:3px solid var(--o);padding:6px 10px;margin-bottom:10px;background:#fffaf3;border-radius:0 8px 8px 0}.hist ul{margin:4px 0;padding-left:18px;font-size:14px}
+.dlg{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:flex-end;justify-content:center;z-index:20}.dlg .card{width:100%;max-width:640px;border-radius:16px 16px 0 0;max-height:90vh;overflow:auto}
+.msg{display:none;position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#e8f5e9;border:1px solid #a5d6a7;padding:10px 16px;border-radius:10px;z-index:30;max-width:90%}.msg.err{background:#ffebee;border-color:#ef9a9a}
+</style></head><body>
+<header id="top" class="solo"><div class="t"><div><h1>LARANJEIRA S.A.S.</h1><div class="sub">App de vendedores</div></div><svg class="logo" viewBox="0 0 228 196" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+<defs><radialGradient id="gS" cx="0" cy="0" r="56" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fbb15e"/><stop offset="1" stop-color="#f27a2a"/></radialGradient></defs>
+<g transform="translate(0 -8) scale(.95)"><circle cx="76" cy="98" r="47" fill="#f08a3c"/>
+<ellipse cx="88" cy="74" rx="21" ry="12" fill="#f6b04a" transform="rotate(-8 88 74)"/>
+<path d="M30 104c-2-26 18-50 44-52 28-2 50 16 52 44 2 26-18 50-46 51-26 1-48-17-50-43z" stroke="#1d1d1b" stroke-width="1.1" fill="none"/>
+<path d="M36 132c8 8 20 13 32 14" stroke="#1d1d1b" stroke-width=".9" fill="none"/></g>
+<g transform="translate(112 100) rotate(140) scale(.64)"><path d="M-72 0 A72 72 0 0 1 72 0 Z" fill="#f08a3c"/>
+<path d="M-64 0 A64 64 0 0 1 64 0 Z" fill="#fbe3c4"/>
+<path d="M-8.0 -0.4 L-53.9 -2.8 A54 54 0 0 1 -48.1 -24.5 L-7.1 -3.6 Z" fill="#f6b04a"/><path d="M-6.7 -4.4 L-45.3 -29.4 A54 54 0 0 1 -29.4 -45.3 L-4.4 -6.7 Z" fill="#f6b04a"/><path d="M-3.6 -7.1 L-24.5 -48.1 A54 54 0 0 1 -2.8 -53.9 L-0.4 -8.0 Z" fill="#f6b04a"/><path d="M0.4 -8.0 L2.8 -53.9 A54 54 0 0 1 24.5 -48.1 L3.6 -7.1 Z" fill="#f6b04a"/><path d="M4.4 -6.7 L29.4 -45.3 A54 54 0 0 1 45.3 -29.4 L6.7 -4.4 Z" fill="#f6b04a"/><path d="M7.1 -3.6 L48.1 -24.5 A54 54 0 0 1 53.9 -2.8 L8.0 -0.4 Z" fill="#f6b04a"/>
+<path d="M-77 3 A75 75 0 0 1 70 -12" fill="none" stroke="#1d1d1b" stroke-width="1.7"/>
+<path d="M58 -30 A70 70 0 0 1 75 4" fill="none" stroke="#1d1d1b" stroke-width="1.4"/>
+<path d="M-74 1 H74" stroke="#1d1d1b" stroke-width="1.6"/>
+<path d="M-58 -4 A60 60 0 0 1 -30 -50" fill="none" stroke="#1d1d1b" stroke-width="1.1" opacity=".75"/>
+<path d="M-6 -4 L-46 -30 M6 -4 L46 -30" stroke="#1d1d1b" stroke-width=".9" opacity=".6"/></g>
+<g transform="translate(0 -8) scale(.95)"><path d="M30 46c14-14 38-16 58-6 10 5 18 12 24 18-14 4-32 2-48-6-14-6-26-8-34-6z" fill="#a8cf6a"/>
+<path d="M28 44c16-12 40-12 60-2 12 6 20 13 26 19-16 3-34 1-50-7-16-8-28-10-36-10z" stroke="#1d1d1b" stroke-width="1" fill="none"/>
+<path d="M34 46c22 0 46 6 76 14M52 44c6 4 12 6 18 6M70 50c6 3 12 4 18 4" stroke="#1d1d1b" stroke-width=".8" opacity=".8" fill="none"/>
+<path d="M104 60c6-8 16-10 26-6 4 2 6 4 8 8-10 4-24 4-34-2z" fill="#8fc25a"/>
+<path d="M102 60c8-8 18-9 28-5 4 2 7 5 9 9-12 3-25 2-37-4zM104 60c10 0 22 2 33 4" stroke="#1d1d1b" stroke-width=".9" fill="none"/>
+<path d="M98 58c2 2 4 4 4 8" stroke="#1d1d1b" stroke-width="1" fill="none"/></g>
+<path id="arcoTxt" d="M60.3 154.1 A70 70 0 0 0 166.6 56.4" fill="none"/>
+<text class="arco" font-family="Chewy,system-ui,sans-serif" font-size="21" letter-spacing="1.2" fill="#f6a85c"><textPath href="#arcoTxt" startOffset="50%" text-anchor="middle">LARANJEIRA S.A.S.</textPath></text>
+</svg></div>
+<div class="usr"><span id="yo"></span><button id="salir" style="display:none">Salir</button></div>
+<nav id="tabs"><button data-v="lista" onclick="go('lista')">📋 Mis pedidos</button><button data-v="nuevo" onclick="go('nuevo')">📝 Nuevo pedido</button></nav></header>
+<main id="main"><div class="card mu">Cargando…</div></main><div id="dlg"></div><div id="msg" class="msg"></div>
+<script type="module" src="app.js"></script></body></html>

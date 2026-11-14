@@ -1,0 +1,137 @@
+import {initializeApp} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,GoogleAuthProvider,signInWithPopup,signOut,sendPasswordResetEmail,updateProfile} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import {getFirestore,collection,doc,onSnapshot,setDoc,updateDoc,runTransaction} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+const cfgFb={apiKey:"AIzaSyDSFDXEku0rMLacznM73yXoXmLsWDyx8S8",authDomain:"laranjeira-sas.firebaseapp.com",projectId:"laranjeira-sas",storageBucket:"laranjeira-sas.firebasestorage.app",messagingSenderId:"253987626533",appId:"1:253987626533:web:9c392b03b1fa35015729cc"};
+const OWNER='gomez.charlie29@gmail.com';
+const app=initializeApp(cfgFb),auth=getAuth(app),fs=getFirestore(app);auth.languageCode='es';
+const $=q=>document.querySelector(q);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money=n=>(Math.round(n||0)<0?'−$':'$')+Math.abs(Math.round(n||0)).toLocaleString('es-AR');
+const today=()=>{const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10)};
+const norm=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+const match=(t,q)=>norm(q).trim().split(/\s+/).every(w=>norm(t).includes(w));
+const r2=x=>Math.round(x*100)/100;
+const S={u:null,perfil:null,owner:false,clientes:[],productos:[],pedidos:[],config:{},vista:'lista',draft:null,q:'',subs:[]};
+const ofertaAct=p=>!!(p&&p.oferta&&p.oferta.hasta>=today()&&(p.oferta.desde||'')<=today());
+const precio=(p,l)=>Math.round(ofertaAct(p)?(l==='min'?p.oferta.min:p.oferta.may):(l==='min'?p.precioMin:p.precioMay))||0;
+const costoU=(p,l)=>l==='min'?(p.costo||0)/(p.kgUn||1):(p.costo||0);
+const total=its=>its.reduce((s,i)=>s+i.cant*i.precio,0);
+function msg(t,err){const m=$('#msg');m.textContent=t;m.className='msg'+(err?' err':'');m.style.display='block';clearTimeout(msg.t);msg.t=setTimeout(()=>m.style.display='none',2800)}
+const propios=()=>!S.owner&&S.perfil&&(S.perfil.acc||[]).includes('propios');
+const misClientes=()=>propios()?S.clientes.filter(c=>c.vendedorId===S.perfil.vendedorId):S.clientes;
+const misPedidos=()=>{const ids=new Set(misClientes().map(c=>c.id));return S.pedidos.filter(p=>!propios()||ids.has(p.clienteId)||p.creadoPor===S.u.uid)};
+const nombreYo=()=>(S.perfil&&S.perfil.nombre)||S.u.displayName||S.u.email;
+
+// ---------- login
+function loginUI(modo){$('#top').classList.add('solo');$('#main').innerHTML=`<div class="card"><h2>${modo==='alta'?'Crear cuenta':'Ingresar'}</h2>
+ <button class="s full" id="lg_g">Entrar con Google</button><div class="mu c">o con tu email</div>
+ ${modo==='alta'?'<label>Nombre y apellido<input id="lg_n" autocomplete="name"></label>':''}
+ <label>Email<input id="lg_e" type="email" autocomplete="email"></label><label>Contraseña<input id="lg_p" type="password"></label>
+ <button class="b full" id="lg_ok">${modo==='alta'?'Crear cuenta':'Ingresar'}</button><div id="lg_m" class="mu" style="margin-top:8px"></div>
+ <div class="row sp" style="margin-top:12px">${modo==='alta'?'<a href="#" id="lg_sw">Ya tengo cuenta</a>':'<a href="#" id="lg_sw">Crear una cuenta</a><a href="#" id="lg_r">Olvidé mi contraseña</a>'}</div></div>`;
+ const m=t=>$('#lg_m').textContent=t;const er=e=>({'auth/invalid-credential':'Email o contraseña incorrectos.','auth/email-already-in-use':'Ese email ya tiene cuenta: ingresá.','auth/weak-password':'Mínimo 6 caracteres.','auth/invalid-email':'Email no válido.'}[e.code]||('Error: '+e.code));
+ $('#lg_g').onclick=async()=>{try{await signInWithPopup(auth,new GoogleAuthProvider())}catch(e){m(er(e))}};
+ $('#lg_sw').onclick=e=>{e.preventDefault();loginUI(modo==='alta'?'login':'alta')};
+ if($('#lg_r'))$('#lg_r').onclick=async e=>{e.preventDefault();const em=$('#lg_e').value.trim();if(!em)return m('Escribí tu email primero.');try{await sendPasswordResetEmail(auth,em);m('Te mandamos un email para cambiarla.')}catch(x){m(er(x))}};
+ $('#lg_ok').onclick=async()=>{const em=$('#lg_e').value.trim(),pw=$('#lg_p').value;try{if(modo==='alta'){const c=await createUserWithEmailAndPassword(auth,em,pw);const n=$('#lg_n').value.trim();if(n)await updateProfile(c.user,{displayName:n});location.reload()}else await signInWithEmailAndPassword(auth,em,pw)}catch(e){m(er(e))}}}
+
+// ---------- arranque
+let iniciado=false;
+onAuthStateChanged(auth,u=>{if(!u){if(iniciado)location.reload();else loginUI('login');return}if(iniciado)return;iniciado=true;S.u=u;
+ S.owner=u.email===OWNER&&u.emailVerified;$('#yo').textContent=u.displayName||u.email;$('#salir').style.display='';$('#salir').onclick=()=>signOut(auth);
+ if(S.owner){S.perfil={rol:'Administrador',activo:true,secc:['pedido'],acc:[]};conectar();return}
+ let prev;onSnapshot(doc(fs,'usuarios/'+u.uid),d=>{const v=d.exists()?d.data():null;const k=JSON.stringify(v);if(prev!==undefined&&k!==prev){location.reload();return}prev=k;S.perfil=v;
+  if(!v||!v.activo||!(v.secc||[]).includes('pedido')){pendiente(v);if(!v)setDoc(doc(fs,'solicitudes/'+u.uid),{creado:new Date().toISOString(),nombre:u.displayName||u.email,email:u.email||'',origen:'app vendedores'}).catch(()=>{});return}
+  conectar()},()=>pendiente(null))});
+function pendiente(v){$('#top').classList.add('solo');$('#main').innerHTML=`<div class="card"><h2>${v&&v.activo===false?'Tu acceso está desactivado':v?'Sin permiso para cargar pedidos':'Esperando aprobación'}</h2><p class="mu">${v?'Pedile a la administración que te habilite "Nuevo pedido".':'La administración ya recibió tu solicitud. Cuando te apruebe, esta pantalla se actualiza sola.'}</p></div>`}
+function conectar(){$('#top').classList.remove('solo');$('#main').innerHTML='<div class="card mu">Cargando…</div>';let n=0;const listo=()=>{if(++n>=4)render()};
+ const sub=(col,key)=>onSnapshot(collection(fs,col),s=>{S[key]=s.docs.map(d=>({id:d.id,...d.data()}));if(!sub[key]){sub[key]=1;listo()}else if(!document.activeElement||!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName))if(S.vista!=='form')render()},e=>{msg('Error de datos: '+e.code,true)});
+ sub('clientes','clientes');sub('productos','productos');sub('pedidos','pedidos');
+ onSnapshot(doc(fs,'config/main'),d=>{S.config=d.exists()?d.data():{};if(!sub.cfg){sub.cfg=1;listo()}},()=>{if(!sub.cfg){sub.cfg=1;listo()}})}
+window.go=v=>{S.vista=v;render();window.scrollTo(0,0)};
+function render(){document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.v===S.vista||(S.vista==='form'&&b.dataset.v==='nuevo'&&!S.draft.editId)));
+ if(S.vista==='lista')return vLista();if(S.vista==='nuevo'){nuevo();return}if(S.vista==='form')return vForm();if(S.vista==='det')return vDet()}
+
+// ---------- lista
+function vLista(){const q=S.q;let ps=misPedidos().slice().sort((a,b)=>b.numero-a.numero);if(q)ps=ps.filter(p=>match(p.clienteNombre+' '+p.numero,q));
+ const hoy=today(),deHoy=ps.filter(p=>p.fecha===hoy&&p.estado!=='anulado');
+ $('#main').innerHTML=`<div class="kp"><div><span>Pedidos de hoy</span><b>${deHoy.length}</b></div><div><span>Total de hoy</span><b>${money(deHoy.reduce((s,p)=>s+p.total,0))}</b></div></div>
+ <input id="q" class="full" placeholder="Buscar cliente o N° de pedido…" value="${esc(q)}">
+ ${ps.slice(0,80).map(p=>`<div class="ped ${p.estado}" onclick="ver('${p.id}')"><div class="row sp"><b>N° ${p.numero} · ${esc(p.clienteNombre)}</b><span class="tag ${p.estado}">${p.estado}</span></div>
+  <div class="row sp mu"><span>${p.fecha}${p.entrega&&p.entrega!==p.fecha?' · entrega '+p.entrega:''} · ${p.cond==='CC'?'Cta. cte.':'Contado'}</span><b style="color:#222">${money(p.total)}</b></div>
+  ${p.historial&&p.historial.length?`<div class="mu">✏️ corregido ${p.historial.length} vez/veces</div>`:''}</div>`).join('')||'<div class="card mu">Todavía no hay pedidos.</div>'}`;
+ $('#q').oninput=e=>{S.q=e.target.value;clearTimeout(S.t);S.t=setTimeout(()=>{vLista();const i=$('#q');i.focus();i.setSelectionRange(i.value.length,i.value.length)},300)}}
+
+// ---------- formulario
+function nuevo(){S.draft={cli:null,items:[],cond:'CONTADO',lista:'may',nota:'',fent:today()};S.vista='form';vForm()}
+window.ver=id=>{S.detId=id;S.vista='det';render();window.scrollTo(0,0)};
+window.editar=id=>{const p=S.pedidos.find(x=>x.id===id);S.draft={editId:id,cli:p.clienteId,items:p.items.map(i=>({...i})),cond:p.cond,lista:(p.items[0]&&p.items[0].lista)||'may',nota:p.nota||'',fent:p.entrega||p.fecha,numero:p.numero};S.vista='form';vForm();window.scrollTo(0,0)};
+function vForm(){const d=S.draft;const c=S.clientes.find(x=>x.id===d.cli);
+ $('#main').innerHTML=`<div class="card"><h2>${d.editId?'Corregir pedido N° '+d.numero:'Nuevo pedido'}</h2>
+ ${c?`<div class="cli"><div><b>${esc(c.nombre)}</b><div class="mu">${esc(c.telefono||'')} ${c.direccion?'· '+esc(c.direccion):''}</div></div>${d.editId?'':'<button class="s" onclick="cambiarCli()">Cambiar</button>'}</div>`
+  :`<input id="cq" class="full" placeholder="Buscar cliente…" autocomplete="off"><div id="cs" class="sug"></div><button class="s full" style="margin-top:6px" onclick="nuevoCli()">+ Cliente nuevo</button>`}
+ <div class="row" style="margin-top:10px"><label>Condición<select id="f_c"><option value="CONTADO" ${d.cond==='CONTADO'?'selected':''}>Contado</option><option value="CC" ${d.cond==='CC'?'selected':''}>Cuenta corriente</option></select></label>
+ <label>Precio<select id="f_l"><option value="may" ${d.lista==='may'?'selected':''}>Mayorista (bulto)</option><option value="min" ${d.lista==='min'?'selected':''}>Minorista (kg/un)</option></select></label>
+ <label>Entrega<input type="date" id="f_e" value="${d.fent}"></label></div></div>
+ <div class="card"><h3>Productos</h3><input id="pq" class="full" placeholder="Agregar producto…" autocomplete="off"><div id="ps" class="sug"></div>
+ <div id="its">${d.items.map((i,k)=>`<div class="it"><div class="g"><b>${esc(i.nombre)}${i.oferta?' 🔥':''}</b><div class="mu">${money(i.precio)} ${i.lista==='min'?'kg/un':'bulto'}</div></div>
+  <div class="q"><button onclick="cant(${k},-${i.lista==='min'?1:0.5})">−</button><input type="number" inputmode="decimal" step="0.5" value="${i.cant}" onchange="cant(${k},null,this.value)"><button onclick="cant(${k},${i.lista==='min'?1:0.5})">+</button></div>
+  <div class="st">${money(i.cant*i.precio)}</div><button class="x" onclick="quitar(${k})">✕</button></div>`).join('')||'<div class="mu" style="padding:8px 0">Buscá y agregá productos.</div>'}</div>
+ <div class="tot">Total <b>${money(total(d.items))}</b></div>
+ <textarea id="f_n" placeholder="Nota (horario, dirección, etc.)">${esc(d.nota)}</textarea>
+ ${d.editId?'<input id="f_mot" class="full" placeholder="Motivo de la corrección (ej.: el cliente sumó 2 cajones)">':''}
+ <div class="mu" style="margin:6px 0">Los cobros los registra la administración.</div>
+ <button class="b full" id="save" onclick="guardar()">${d.editId?'Guardar corrección':'Guardar pedido'}</button><button class="s full" style="margin-top:6px" onclick="cancelar()">Cancelar</button></div>`;
+ $('#f_c').onchange=e=>d.cond=e.target.value;$('#f_l').onchange=e=>{d.lista=e.target.value};$('#f_e').onchange=e=>d.fent=e.target.value;$('#f_n').oninput=e=>d.nota=e.target.value;
+ if(!c)picker('#cq','#cs',q=>misClientes().filter(x=>match(x.nombre+' '+(x.telefono||''),q)).slice(0,10).map(x=>({id:x.id,html:`${esc(x.nombre)} <span class="mu">${esc(x.telefono||'')}</span>`})),id=>{const x=S.clientes.find(y=>y.id===id);d.cli=id;d.cond=x.tipo==='CUENTA CORRIENTE'?'CC':'CONTADO';vForm()});
+ picker('#pq','#ps',q=>S.productos.filter(x=>x.activo!==false&&match(x.nombre,q)).slice(0,12).map(x=>({id:x.id,html:`${esc(x.nombre)}${ofertaAct(x)?' 🔥':''} <span class="mu">${money(precio(x,d.lista))}</span>`})),id=>{const p=S.productos.find(x=>x.id===id);
+  const e=d.items.find(i=>i.prodId===id&&i.lista===d.lista);if(e)e.cant=r2(e.cant+(d.lista==='min'?1:1));else d.items.push({prodId:p.id,nombre:p.nombre,cant:1,precio:precio(p,d.lista),costo:costoU(p,d.lista),lista:d.lista,oferta:ofertaAct(p)?p.oferta.pct:0});vForm();setTimeout(()=>$('#pq').focus(),0)})}
+window.cant=(k,dl,v)=>{const i=S.draft.items[k];i.cant=Math.max(0,r2(v!=null?parseFloat(v)||0:i.cant+dl));guardarCampos();vForm()};
+window.quitar=k=>{S.draft.items.splice(k,1);guardarCampos();vForm()};
+const guardarCampos=()=>{const n=$('#f_n');if(n)S.draft.nota=n.value};
+window.cambiarCli=()=>{S.draft.cli=null;vForm()};
+window.cancelar=()=>{const e=S.draft.editId;S.draft=null;if(e)ver(e);else go('lista')};
+window.nuevoCli=()=>{dlg(`<h2>Cliente nuevo</h2><label>Nombre / comercio<input id="nc_n"></label><label>Teléfono<input id="nc_t" type="tel"></label><label>Dirección<input id="nc_d"></label>
+ <label>Tipo<select id="nc_tp"><option>CONTADO</option><option>CUENTA CORRIENTE</option></select></label><button class="b full" onclick="guardarCli()">Guardar cliente</button><button class="s full" style="margin-top:6px" onclick="cerrar()">Cancelar</button>`)};
+window.guardarCli=async()=>{const n=$('#nc_n').value.trim().toUpperCase();if(!n)return msg('Poné el nombre',true);const id='C-'+norm(n).replace(/[^a-z0-9]+/g,'-').slice(0,40)+'-'+Date.now().toString(36);
+ const d={nombre:n,telefono:$('#nc_t').value.trim(),direccion:$('#nc_d').value.trim(),tipo:$('#nc_tp').value,categoria:'Nuevo',vendedorId:(S.perfil&&S.perfil.vendedorId)||'',estadoContacto:'Cliente',creado:new Date().toISOString(),creadoPor:S.u.uid};
+ try{await setDoc(doc(fs,'clientes/'+id),d);S.clientes.push({id,...d});S.draft.cli=id;S.draft.cond=d.tipo==='CUENTA CORRIENTE'?'CC':'CONTADO';cerrar();vForm();msg('Cliente guardado')}catch(e){msg('No se pudo guardar: '+e.code,true)}};
+function difs(a,b){const k=i=>i.prodId+'|'+(i.lista||'may');const A=Object.fromEntries(a.map(i=>[k(i),i])),B=Object.fromEntries(b.map(i=>[k(i),i]));const out=[];
+ for(const [x,i] of Object.entries(B)){const o=A[x];if(!o)out.push('+ '+i.cant+' '+i.nombre);else if(o.cant!==i.cant)out.push(i.nombre+': '+o.cant+' → '+i.cant);else if(o.precio!==i.precio)out.push(i.nombre+': precio '+money(o.precio)+' → '+money(i.precio))}
+ for(const [x,o] of Object.entries(A))if(!B[x])out.push('− '+o.cant+' '+o.nombre+' (quitado)');return out}
+window.guardar=async()=>{guardarCampos();const d=S.draft;const c=S.clientes.find(x=>x.id===d.cli);const its=d.items.filter(i=>i.cant>0);if(!c)return msg('Elegí el cliente',true);if(!its.length)return msg('Agregá al menos un producto',true);
+ const b=$('#save');b.disabled=true;b.textContent='Guardando…';const ahora=new Date().toISOString();
+ try{if(d.editId){const old=S.pedidos.find(p=>p.id===d.editId);if(old.estado!=='pendiente')throw{code:'El pedido ya está '+old.estado+': no se puede corregir'};
+   const cambios=difs(old.items,its);if(old.entrega!==d.fent)cambios.push('Entrega: '+old.entrega+' → '+d.fent);if(old.cond!==d.cond)cambios.push('Condición: '+old.cond+' → '+d.cond);if((old.nota||'')!==d.nota)cambios.push('Nota cambiada');
+   if(!cambios.length){b.disabled=false;b.textContent='Guardar corrección';return msg('No hay cambios',true)}
+   const upd={items:its,total:total(its),costo:its.reduce((s,i)=>s+i.cant*(i.costo||0),0),cond:d.cond,nota:d.nota,entrega:d.fent,editado:ahora,
+    historial:[...(old.historial||[]),{fecha:ahora,totalAnterior:old.total,totalNuevo:total(its),itemsAnteriores:old.items,por:nombreYo(),porId:S.u.uid,cambios,motivo:($('#f_mot')&&$('#f_mot').value)||'',origen:'app vendedores'}].slice(-30)};
+   await updateDoc(doc(fs,'pedidos/'+d.editId),upd);S.draft=null;msg('Corrección guardada');ver(d.editId)}
+  else{const base={fecha:today(),entrega:d.fent||today(),clienteId:c.id,clienteNombre:c.nombre,vendedorId:c.vendedorId||(S.perfil&&S.perfil.vendedorId)||'',items:its,total:total(its),costo:its.reduce((s,i)=>s+i.cant*(i.costo||0),0),cond:d.cond,estado:'pendiente',nota:d.nota,creado:ahora,creadoPor:S.u.uid,creadoPorNombre:nombreYo(),origen:'app vendedores'};
+   const maxNum=Math.max(0,...S.pedidos.map(p=>p.numero||0));
+   const id=await runTransaction(fs,async t=>{const cr=doc(fs,'config/main');const cs=await t.get(cr);let n=Math.max((cs.exists()&&cs.data().proximo)||1,maxNum+1);
+    for(let k=0;k<20;k++){const pr=doc(fs,'pedidos/P'+String(n).padStart(6,'0'));const ex=await t.get(pr);if(!ex.exists()){t.set(pr,{...base,numero:n});if(cs.exists())t.update(cr,{proximo:n+1});else t.set(cr,{proximo:n+1});return pr.id}n++}throw{code:'sin número'}});
+   S.draft=null;msg('Pedido guardado');ver(id)}}
+ catch(e){b.disabled=false;b.textContent=d.editId?'Guardar corrección':'Guardar pedido';msg('No se pudo guardar: '+(e.code||e.message),true)}};
+
+// ---------- detalle
+function boletaTxt(p){const n=(S.config&&S.config.negocio)||'Laranjeira S.A.S';return `*${n}* – Pedido N° ${p.numero}\nCliente: ${p.clienteNombre}\nFecha: ${p.fecha} · Entrega: ${p.entrega}\n`+p.items.map(i=>`• ${i.cant} ${i.lista==='min'?'kg/un':'bulto'} ${i.nombre}${i.oferta?' 🔥':''} x ${money(i.precio)} = ${money(i.cant*i.precio)}`).join('\n')+`\n*TOTAL: ${money(p.total)}*\nCondición: ${p.cond==='CC'?'Cuenta corriente':'Contado'}`+(p.nota?`\nNota: ${p.nota}`:'')+(p.historial&&p.historial.length?`\n_Pedido corregido el ${new Date(p.editado).toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'})}_`:'')}
+function vDet(){const p=S.pedidos.find(x=>x.id===S.detId);if(!p)return go('lista');const c=S.clientes.find(x=>x.id===p.clienteId)||{};const tel=String(c.telefono||'').replace(/\D/g,'').slice(-10);const t=boletaTxt(p);
+ $('#main').innerHTML=`<button class="s" onclick="go('lista')">← Mis pedidos</button>
+ <div class="card"><div class="row sp"><h2>Pedido N° ${p.numero}</h2><span class="tag ${p.estado}">${p.estado}</span></div><div class="mu">${esc(p.clienteNombre)} · ${p.fecha} · entrega ${p.entrega} · ${p.cond==='CC'?'Cuenta corriente':'Contado'}</div>
+ <table>${p.items.map(i=>`<tr><td>${i.cant} ${i.lista==='min'?'kg/un':'bulto'}</td><td>${esc(i.nombre)}${i.oferta?' 🔥':''}</td><td class="n">${money(i.cant*i.precio)}</td></tr>`).join('')}<tr><th colspan="2">Total</th><th class="n">${money(p.total)}</th></tr></table>
+ ${p.nota?`<div class="mu">Nota: ${esc(p.nota)}</div>`:''}
+ <div class="row" style="margin-top:10px">${p.estado==='pendiente'?`<button class="b" onclick="editar('${p.id}')">✏️ Corregir</button>`:`<span class="mu">${p.estado==='entregado'?'Ya entregado: para cambios hablá con la administración.':'Pedido anulado.'}</span>`}
+ ${tel?`<a class="s" href="https://wa.me/549${tel}?text=${encodeURIComponent(t)}" target="_blank" rel="noopener">📲 Enviar boleta</a>`:''}<button class="s" onclick="copiar('${p.id}')">Copiar boleta</button></div></div>
+ <div class="card"><h3>Historial de correcciones</h3>${(p.historial||[]).slice().reverse().map(h=>`<div class="hist"><div class="row sp"><b>${new Date(h.fecha).toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'})}</b><span class="mu">${esc(h.por||'Administración')}</span></div>
+  ${h.cambios?`<ul>${h.cambios.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:'<div class="mu">Cambios hechos desde el sistema</div>'}${h.motivo?`<div class="mu">Motivo: ${esc(h.motivo)}</div>`:''}<div class="mu">Total ${money(h.totalAnterior)} → ${money(h.totalNuevo??p.total)}</div></div>`).join('')||'<div class="mu">Sin correcciones.</div>'}
+  <div class="mu" style="margin-top:6px">Creado ${p.creadoPorNombre?'por '+esc(p.creadoPorNombre)+' ':''}el ${p.fecha}.</div></div>`}
+window.copiar=async id=>{try{await navigator.clipboard.writeText(boletaTxt(S.pedidos.find(p=>p.id===id)));msg('Boleta copiada')}catch(e){msg('No se pudo copiar',true)}};
+
+// ---------- utilidades
+function picker(inp,box,src,pick){const I=$(inp),B=$(box);if(!I)return;let list=[],act=0;
+ const draw=()=>{B.innerHTML=list.map((x,k)=>`<div class="${k===act?'on':''}" data-k="${k}">${x.html}</div>`).join('');B.style.display=list.length?'block':'none'};
+ I.oninput=()=>{const q=I.value.trim();list=q?src(q):[];act=0;draw()};I.onkeydown=e=>{if(e.key==='Enter'&&list[act]){e.preventDefault();pick(list[act].id)}else if(e.key==='ArrowDown'){act=Math.min(act+1,list.length-1);draw()}else if(e.key==='ArrowUp'){act=Math.max(act-1,0);draw()}};
+ B.onmousedown=e=>{const d=e.target.closest('[data-k]');if(d){e.preventDefault();pick(list[+d.dataset.k].id)}}}
+function dlg(h){$('#dlg').innerHTML=`<div class="dlg"><div class="card">${h}</div></div>`}window.cerrar=()=>$('#dlg').innerHTML='';
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});

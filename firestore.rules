@@ -29,7 +29,7 @@ service cloud.firestore {
     match /clientes/{id} { allow read, create, update: if activo(); allow delete: if acc('eliminar'); }
     match /productos/{id} { allow read, update: if activo(); allow create, delete: if acc('precios'); }
     match /pedidos/{id} { allow read, create, update: if activo(); allow delete: if acc('eliminar'); }
-    match /pagos/{id} { allow read, create: if activo(); allow update, delete: if acc('cobrar') || acc('eliminar'); }
+    match /pagos/{id} { allow read: if activo(); allow create: if acc('cobrar'); allow update, delete: if acc('cobrar') || acc('eliminar'); }
     match /bajas/{id} { allow read, create, update: if activo(); allow delete: if acc('eliminar'); }
     match /reposiciones/{id} { allow read, create, update: if activo(); allow delete: if acc('eliminar'); }
     match /config/{id} { allow read, write: if activo(); }
