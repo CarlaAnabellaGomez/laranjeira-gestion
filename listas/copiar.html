@@ -1,0 +1,8 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Copiar lista Laranjeira</title>
+<style>body{font-family:sans-serif;margin:20px}button{font-size:18px;padding:12px 20px;margin:6px}img{max-width:420px;display:block;margin-top:10px;border:1px solid #ccc}</style></head>
+<body><h2>Laranjeira – copiar lista mayorista</h2>
+<button id="ci">Copiar imagen</button><span id="st"></span>
+<img id="im" src="lista_mayorista_23-11.png">
+<script>
+document.getElementById('ci').onclick=async()=>{const st=document.getElementById('st');try{const b=await (await fetch('lista_mayorista_23-11.png',{cache:'no-store'})).blob();await navigator.clipboard.write([new ClipboardItem({'image/png':b})]);st.textContent=' ✅ Imagen copiada'}catch(e){st.textContent=' ❌ '+e.message}};
+</script></body></html>
