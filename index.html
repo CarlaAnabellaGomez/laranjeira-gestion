@@ -807,7 +807,19 @@ function editVend(id){const v=id?S.vendedores.find(x=>x.id===id):{nombre:'',moda
  <div class="row" style="margin-top:6px"><label>Pago de sueldo<br><select id="v_m">${['Semanal','Quincenal'].map(x=>`<option ${v.modalidad===x?'selected':''}>${x}</option>`).join('')}</select></label><label>Sueldo por período $<br><input id="v_s" type="number" step="1000" value="${v.sueldo||0}"></label>
  <label class="row" style="gap:6px;margin-top:18px"><input type="checkbox" id="v_a" ${v.activo!==false?'checked':''}> Activo</label></div>
  <label style="display:block;margin-top:6px">Notas<br><textarea id="v_no">${esc(v.notas||'')}</textarea></label>
- <div class="row" style="margin-top:10px"><button class="b" onclick="guardarVend('${id||''}')" ${S.can?'':'disabled'}>Guardar</button><button class="s" onclick="closeDlg()">Cancelar</button></div>`)}
+ <div class="row" style="margin-top:10px"><button class="b" onclick="guardarVend('${id||''}')" ${S.can?'':'disabled'}>Guardar</button><button class="s" onclick="closeDlg()">Cancelar</button>${id&&S.can?`<button class="x" style="margin-left:auto" onclick="eliminarVend('${id}')">🗑 Eliminar vendedor</button>`:''}</div>`)}
+function eliminarVend(id){const v=S.vendedores.find(x=>x.id===id);if(!v)return;const mv=S.movVend.filter(m=>m.vendedorId===id);const cl=S.clientes.filter(c=>c.vendedorId===id);
+ dlg(`<h2>¿Eliminar a ${esc(v.nombre)}?</h2><p>Se borra la ficha del vendedor. <b>No se puede deshacer.</b></p>
+ ${cl.length?`<div class="card warn" style="margin:8px 0">Tiene ${cl.length} cliente(s) asignado(s): ${cl.slice(0,8).map(c=>esc(c.nombre)).join(', ')}${cl.length>8?'…':''}. Van a quedar <b>sin vendedor</b>.</div>`:''}
+ ${mv.length?`<div class="card warn" style="margin:8px 0">Tiene ${mv.length} movimiento(s) (sueldos, adelantos, mercadería).</div>
+ <label style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox" id="dv_all" style="margin-top:3px"> <span>Borrar también todos sus movimientos (solo si era de práctica)</span></label>
+ <div class="mu">Si lo dejás destildado, los movimientos quedan en el historial con su nombre. La mercadería que se llevó no vuelve al stock.</div>`:''}
+ <div class="mu" style="margin-top:6px">Si solo dejó de trabajar, también podés destildar <b>Activo</b> en vez de eliminarlo.</div>
+ <div class="row" style="margin-top:10px"><button class="x" onclick="eliminarVend2('${id}')">Sí, eliminar</button><button class="s" onclick="closeDlg()">Cancelar</button></div>`)}
+async function eliminarVend2(id){const all=$('#dv_all')?$('#dv_all').checked:false;setSt('Eliminando…');
+ try{for(const c of S.clientes.filter(c=>c.vendedorId===id))await S.db.doc('clientes/'+c.id).update({vendedorId:''});
+  if(all)for(const m of S.movVend.filter(m=>m.vendedorId===id))await S.db.doc('movVendedores/'+m.id).delete();
+  await S.db.doc('vendedores/'+id).delete();closeDlg();setSt('Listo');msg('Vendedor eliminado')}catch(e){setSt('');msg('No se pudo eliminar: '+(e.message||e.code),true)}}
 async function guardarVend(id){const n=$('#v_n').value.trim();if(!n)return msg('Falta el nombre',true);
  const d={nombre:n.toUpperCase(),telefono:$('#v_t').value.trim(),modalidad:$('#v_m').value,sueldo:parseFloat($('#v_s').value)||0,activo:$('#v_a').checked,notas:$('#v_no').value};
  try{if(id)await S.db.doc('vendedores/'+id).update(d);else{let nid='V-'+slug(n);if(S.vendedores.some(x=>x.id===nid))nid+='-'+Date.now().toString(36);await S.db.doc('vendedores/'+nid).set(d)}closeDlg();msg('Vendedor guardado')}catch(e){msg('No se pudo guardar',true)}}
